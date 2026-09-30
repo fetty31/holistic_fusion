@@ -1,0 +1,10 @@
+/ona_estimator_node:
+  ros__parameters:
+    #External Prior/Transform Input
+    extrinsics:
+      lidarOdometryFrame: "ona2/base_footprint"         #LiDAR frame name - used to lookup LiDAR-to-ExternalSensor Frame
+      gnssFrame: "ubx"                                  # GNSS frame - used to lookup GNSS-to-ExternalSensor frame
+      wheelOdometryBetweenFrame: "ona2/base_footprint"  #Wheel odometry frame name - used to lookup Wheel-to-ExternalSensor Frame
+      wheelLinearVelocityLeftFrame: "LH_WHEEL"          #Wheel linear velocity left frame name - used to lookup Wheel-to-ExternalSensor Frame
+      wheelLinearVelocityRightFrame: "RH_WHEEL"         #Wheel linear velocity right frame name - used to lookup Wheel-to-ExternalSensor Frame
+      vioOdometryFrame: "ona2/base_footprint"           #VIO odometry frame name - used to lookup VIO-to-ExternalSensor Frame
