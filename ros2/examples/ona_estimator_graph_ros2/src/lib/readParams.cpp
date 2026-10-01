@@ -24,23 +24,23 @@ void OnaEstimator::readParams() {
   }
 
   // Flags
-  useLioOdometryFlag_ = holistic_fusion::tryGetParam<bool>(this, "sensor_params.useLioOdometry");
-  dynamic_cast<OnaStaticTransforms*>(staticTransformsPtr_.get())->setUseLioOdometryFlag(useLioOdometryFlag_);
+  useLioUnaryFlag_ = holistic_fusion::tryGetParam<bool>(this, "sensor_params.useLioOdometry");
+  dynamic_cast<OnaStaticTransforms*>(staticTransformsPtr_.get())->setUseLioUnaryFlag(useLioUnaryFlag_);
   useGnssUnaryFlag_ = holistic_fusion::tryGetParam<bool>(this, "sensor_params.useGnss");
   dynamic_cast<OnaStaticTransforms*>(staticTransformsPtr_.get())->setUseGnssFlag(useGnssUnaryFlag_);
   useWheelOdometryBetweenFlag_ = holistic_fusion::tryGetParam<bool>(this, "sensor_params.useWheelOdometryBetween");
   dynamic_cast<OnaStaticTransforms*>(staticTransformsPtr_.get())->setUseWheelOdometryBetweenFlag(useWheelOdometryBetweenFlag_);
   useWheelLinearVelocitiesFlag_ = holistic_fusion::tryGetParam<bool>(this, "sensor_params.useWheelLinearVelocities");
   dynamic_cast<OnaStaticTransforms*>(staticTransformsPtr_.get())->setUseWheelLinearVelocitiesFlag(useWheelLinearVelocitiesFlag_);
-  useVioOdometryFlag_ = holistic_fusion::tryGetParam<bool>(this, "sensor_params.useVioOdometry");
-  dynamic_cast<OnaStaticTransforms*>(staticTransformsPtr_.get())->setUseVioOdometryFlag(useVioOdometryFlag_);
+  useOdometryFlag_ = holistic_fusion::tryGetParam<bool>(this, "sensor_params.useOdometry");
+  dynamic_cast<OnaStaticTransforms*>(staticTransformsPtr_.get())->setUseOdometryFlag(useOdometryFlag_);
 
   // Sensor Params
   lioOdometryRate_ = holistic_fusion::tryGetParam<double>(this, "sensor_params.lioOdometryRate");
   gnssRate_ = holistic_fusion::tryGetParam<double>(this, "sensor_params.gnssRate");
   wheelOdometryBetweenRate_ = holistic_fusion::tryGetParam<double>(this, "sensor_params.wheelOdometryBetweenRate");
   wheelLinearVelocitiesRate_ = holistic_fusion::tryGetParam<double>(this, "sensor_params.wheelLinearVelocitiesRate");
-  vioOdometryRate_ = holistic_fusion::tryGetParam<double>(this, "sensor_params.vioOdometryRate");
+  OdometryRate_ = holistic_fusion::tryGetParam<double>(this, "sensor_params.OdometryRate");
 
   // Gnss parameters ---------------------------------------------------
   if (useGnssUnaryFlag_) {
@@ -112,11 +112,11 @@ void OnaEstimator::readParams() {
   const auto wheelLinearVelocitiesNoise =
       holistic_fusion::tryGetParam<std::vector<double>>(this, "noise_params.wheelLinearVelocitiesNoiseDensity");  // left,right
   wheelLinearVelocitiesNoise_ << wheelLinearVelocitiesNoise[0], wheelLinearVelocitiesNoise[1], wheelLinearVelocitiesNoise[2];
-  /// VIO Odometry
-  const auto vioPoseBetweenNoise =
-      holistic_fusion::tryGetParam<std::vector<double>>(this, "noise_params.vioPoseBetweenNoiseDensity");  // roll,pitch,yaw,x,y,z
-  vioPoseBetweenNoise_ << vioPoseBetweenNoise[0], vioPoseBetweenNoise[1], vioPoseBetweenNoise[2], vioPoseBetweenNoise[3],
-      vioPoseBetweenNoise[4], vioPoseBetweenNoise[5];
+  /// Odometry (LIO/VIO)
+  const auto odometryPoseBetweenNoise =
+      holistic_fusion::tryGetParam<std::vector<double>>(this, "noise_params.odometryPoseBetweenNoiseDensity");  // roll,pitch,yaw,x,y,z
+  odometryPoseBetweenNoise_ << odometryPoseBetweenNoise[0], odometryPoseBetweenNoise[1], odometryPoseBetweenNoise[2], odometryPoseBetweenNoise[3],
+      odometryPoseBetweenNoise[4], odometryPoseBetweenNoise[5];
 
   // Set frames
   /// LiDAR odometry frame
@@ -136,9 +136,9 @@ void OnaEstimator::readParams() {
   dynamic_cast<OnaStaticTransforms*>(staticTransformsPtr_.get())
       ->setWheelLinearVelocityRightFrame(holistic_fusion::tryGetParam<std::string>(this, "extrinsics.wheelLinearVelocityRightFrame"));
 
-  /// VIO Odometry frame
+  /// VIO/LIO Odometry frame
   dynamic_cast<OnaStaticTransforms*>(staticTransformsPtr_.get())
-      ->setVioOdometryFrame(holistic_fusion::tryGetParam<std::string>(this, "extrinsics.vioOdometryFrame"));
+      ->setOdometryFrame(holistic_fusion::tryGetParam<std::string>(this, "extrinsics.OdometryFrame"));
 
   // Wheel Radius
   wheelRadiusMeter_ = holistic_fusion::tryGetParam<double>(this, "sensor_params.wheelRadius");

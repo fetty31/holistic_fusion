@@ -61,7 +61,7 @@ class OnaEstimator : public holistic_fusion::HolisticFusionRos2 {
   double gnssRate_ = 2.0;
   double wheelOdometryBetweenRate_ = 50.0;
   double wheelLinearVelocitiesRate_ = 50.0;
-  double vioOdometryRate_ = 50.0;
+  double OdometryRate_ = 50.0;
 
   // Alignment Parameters
   Eigen::Matrix<double, 6, 1> initialSe3AlignmentNoise_ = 1.0 * Eigen::Matrix<double, 6, 1>::Ones();
@@ -82,29 +82,37 @@ class OnaEstimator : public holistic_fusion::HolisticFusionRos2 {
   Eigen::Matrix<double, 6, 1> wheelPoseBetweenNoise_;
   // Linear Velocities
   Eigen::Matrix<double, 3, 1> wheelLinearVelocitiesNoise_;
-  // VIO Odometry
-  Eigen::Matrix<double, 6, 1> vioPoseBetweenNoise_;
+  // Odometry
+  Eigen::Matrix<double, 6, 1> odometryPoseBetweenNoise_;
 
   // ROS Related stuff ----------------------------
 
   // Callbacks
   // LiDAR
-  void lidarOdometryCallback_(const nav_msgs::msg::Odometry::ConstSharedPtr& lidarOdomPtr);
+  void lidarUnaryCallback_(const nav_msgs::msg::Odometry::ConstSharedPtr& lidarOdomPtr);
   // GNSS
-  void gnssFixCallback_(const sensor_msgs::msg::NavSatFix::ConstSharedPtr& lidarOdomPtr);
+  void gnssFixCallback_(const sensor_msgs::msg::NavSatFix::ConstSharedPtr& gnssMsgPtr);
   // Wheel Between
   void wheelOdometryPoseCallback_(const nav_msgs::msg::Odometry::ConstSharedPtr& wheelOdomPtr);
   // Wheel Linear Velocities
   void wheelLinearVelocitiesCallback_(const std_msgs::msg::Float64MultiArray::ConstSharedPtr& wheelsSpeedsPtr);
-  // VIO
-  void vioOdometryCallback_(const nav_msgs::msg::Odometry::ConstSharedPtr& vioOdomPtr);
+  // Odometry between
+  void odometryBetweenCallback_(const nav_msgs::msg::Odometry::ConstSharedPtr& OdomPtr);
 
   // Callback Members
+    // wheel odometry
   int wheelOdometryCallbackCounter_ = -1;
   Eigen::Isometry3d T_O_Bw_km1_;
   double wheelOdometryTimeKm1_ = 0.0;
+
+    // IMU
   int num_imu_errors_ = 0;
   rclcpp::Time last_imu_timestamp_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
+
+    // LIO/VIO (full odometry)
+  int odomBetweenCallbackCounter_ = -1;
+  Eigen::Isometry3d odom_T_M_Lkm1_;
+  double odomBetweenTimeKm1_ = 0.0;
 
     // GNSS
   Eigen::Vector3d accumulatedGnssCoordinates_{0.0, 0.0, 0.0};
@@ -115,24 +123,24 @@ class OnaEstimator : public holistic_fusion::HolisticFusionRos2 {
   rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr subGnssUnary_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr subWheelOdometryBetween_;
   rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr subWheelLinearVelocities_;
-  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr subVioOdometry_;
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr subOdometry_;
 
   // Publishers
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pubMeasMapLioPath_;
-  rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pubMeasMapVioPath_;
+  rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pubMeasMapOdomPath_;
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pubMeasWorldGnssPath_;
 
   // Messages
   std::shared_ptr<nav_msgs::msg::Path> measLio_mapImuPathPtr_;
-  std::shared_ptr<nav_msgs::msg::Path> measVio_mapImuPathPtr_;
+  std::shared_ptr<nav_msgs::msg::Path> measOdom_worldImuPathPtr_;
   std::shared_ptr<nav_msgs::msg::Path> measGnss_worldGnssPathPtr_;
 
   // Flags
-  bool useLioOdometryFlag_ = true;
+  bool useLioUnaryFlag_ = true;
   bool useGnssUnaryFlag_ = true;
   bool useWheelOdometryBetweenFlag_ = false;
   bool useWheelLinearVelocitiesFlag_ = false;
-  bool useVioOdometryFlag_ = false;
+  bool useOdometryFlag_ = false;
 
   // Wheel Radius
   double wheelRadiusMeter_ = 0.195;

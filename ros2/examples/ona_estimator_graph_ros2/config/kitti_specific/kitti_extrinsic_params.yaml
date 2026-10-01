@@ -7,4 +7,4 @@
       wheelOdometryBetweenFrame: "base_link"      #Wheel odometry frame name - used to lookup Wheel-to-ExternalSensor Frame
       wheelLinearVelocityLeftFrame: "LH_WHEEL"    #Wheel linear velocity left frame name - used to lookup Wheel-to-ExternalSensor Frame
       wheelLinearVelocityRightFrame: "RH_WHEEL"   #Wheel linear velocity right frame name - used to lookup Wheel-to-ExternalSensor Frame
-      vioOdometryFrame: "base_link"               #VIO odometry frame name - used to lookup VIO-to-ExternalSensor Frame
+      OdometryFrame: "base_link"                  #VIO/LIO full odometry frame name - used to lookup VIO/LIO-to-ExternalSensor Frame

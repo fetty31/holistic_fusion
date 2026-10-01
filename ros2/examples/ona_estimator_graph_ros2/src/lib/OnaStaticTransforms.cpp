@@ -40,7 +40,7 @@ bool OnaStaticTransforms::findTransformations() {
   Eigen::Isometry3d eigenTransform;
 
   // Imu to LiDAR Link ---
-  if (useLioOdometryFlag_) {
+  if (useLioUnaryFlag_) {
     REGULAR_COUT << COLOR_END << " Waiting for transform between " << imuFrame_ << " and " << lidarOdometryFrame_ << " for 10 seconds." << std::endl;
     transform = tf_buffer_->lookupTransform(imuFrame_, lidarOdometryFrame_, tf2::TimePointZero, tf2::durationFromSec(1.0));
     eigenTransform = tf2::transformToEigen(transform.transform);
@@ -63,16 +63,16 @@ bool OnaStaticTransforms::findTransformations() {
     lv_T_frame1_frame2(gnssFrame_, imuFrame_) = rv_T_frame1_frame2(imuFrame_, gnssFrame_).inverse();
   }
 
-  // Imu to VIO Link ---
-  if (useVioOdometryFlag_) {
-    REGULAR_COUT << COLOR_END << " Waiting for transform between " << imuFrame_ << " and " << vioOdometryFrame_ << " for 10 seconds." << std::endl;
-    transform = tf_buffer_->lookupTransform(imuFrame_, vioOdometryFrame_, tf2::TimePointZero, tf2::durationFromSec(1.0));
+  // Imu to VIO/LIO (odometry source) Link ---
+  if (useOdometryFlag_) {
+    REGULAR_COUT << COLOR_END << " Waiting for transform between " << imuFrame_ << " and " << OdometryFrame_ << " for 10 seconds." << std::endl;
+    transform = tf_buffer_->lookupTransform(imuFrame_, OdometryFrame_, tf2::TimePointZero, tf2::durationFromSec(1.0));
     eigenTransform = tf2::transformToEigen(transform.transform);
-    lv_T_frame1_frame2(imuFrame_, vioOdometryFrame_) = eigenTransform;
+    lv_T_frame1_frame2(imuFrame_, OdometryFrame_) = eigenTransform;
 
-    std::cout << YELLOW_START << "Ona-StaticTransforms" << COLOR_END << " Translation I_VIO: " << imuFrame_ << " " << vioOdometryFrame_
-              << " " << rv_T_frame1_frame2(imuFrame_, vioOdometryFrame_).translation() << std::endl;
-    lv_T_frame1_frame2(vioOdometryFrame_, imuFrame_) = rv_T_frame1_frame2(imuFrame_, vioOdometryFrame_).inverse();
+    std::cout << YELLOW_START << "Ona-StaticTransforms" << COLOR_END << " Translation I_VIO/LIO: " << imuFrame_ << " " << OdometryFrame_
+              << " " << rv_T_frame1_frame2(imuFrame_, OdometryFrame_).translation() << std::endl;
+    lv_T_frame1_frame2(OdometryFrame_, imuFrame_) = rv_T_frame1_frame2(imuFrame_, OdometryFrame_).inverse();
   }
 
   // Wheel Frames ---

@@ -21,7 +21,7 @@ def generate_launch_description():
     lidar_odometry_topic_name = LaunchConfiguration("lidar_odometry_topic_name")
     wheel_odometry_topic_name = LaunchConfiguration("wheel_odometry_topic_name")
     wheel_velocities_topic_name = LaunchConfiguration("wheel_velocities_topic_name")
-    vio_odometry_topic_name = LaunchConfiguration("vio_odometry_topic_name")
+    odometry_topic_name = LaunchConfiguration("odometry_topic_name")
     logging_dir_location = LaunchConfiguration("logging_dir_location")
 
     # Default config file paths
@@ -75,9 +75,9 @@ def generate_launch_description():
                 description="Wheel velocities topic name",
             ),
             DeclareLaunchArgument(
-                "vio_odometry_topic_name",
-                default_value="/tracking_camera/odom/sample",
-                description="VIO odometry topic name",
+                "odometry_topic_name",
+                default_value="/lio_ros/state",
+                description="Odometry topic name",
             ),
             DeclareLaunchArgument(
                 "logging_dir_location",
@@ -112,7 +112,7 @@ def generate_launch_description():
                     ("/lidar_odometry_topic", lidar_odometry_topic_name),
                     ("/wheel_odometry_topic", wheel_odometry_topic_name),
                     ("/wheel_velocities_topic", wheel_velocities_topic_name),
-                    ("/vio_odometry_topic", vio_odometry_topic_name),
+                    ("/odometry_topic", odometry_topic_name),
                 ],
             ),
         ]

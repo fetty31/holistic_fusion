@@ -31,14 +31,14 @@ void OnaEstimator::setup() {
   this->declare_parameter("sensor_params.useGnss", false);
   this->declare_parameter("sensor_params.useWheelOdometryBetween", false);
   this->declare_parameter("sensor_params.useWheelLinearVelocities", false);
-  this->declare_parameter("sensor_params.useVioOdometry", false);
+  this->declare_parameter("sensor_params.useOdometry", false);
 
   // Sensor parameters (int)
   this->declare_parameter("sensor_params.lioOdometryRate", 0.0);
   this->declare_parameter("sensor_params.gnssRate", 0.0);
   this->declare_parameter("sensor_params.wheelOdometryBetweenRate", 0.0);
   this->declare_parameter("sensor_params.wheelLinearVelocitiesRate", 0.0);
-  this->declare_parameter("sensor_params.vioOdometryRate", 0.0);
+  this->declare_parameter("sensor_params.OdometryRate", 0.0);
 
   // GNSS config
   this->declare_parameter("gnss.initYaw", 0.0);
@@ -64,7 +64,7 @@ void OnaEstimator::setup() {
   this->declare_parameter("noise_params.lioPoseUnaryStdDev", std::vector<double>{0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
   this->declare_parameter("noise_params.wheelPoseBetweenNoiseDensity", std::vector<double>{0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
   this->declare_parameter("noise_params.wheelLinearVelocitiesNoiseDensity", std::vector<double>{0.0, 0.0, 0.0});
-  this->declare_parameter("noise_params.vioPoseBetweenNoiseDensity", std::vector<double>{0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
+  this->declare_parameter("noise_params.odometryPoseBetweenNoiseDensity", std::vector<double>{0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
   this->declare_parameter("noise_params.gnssPositionOutlierThreshold", 1.0);
 
   // Extrinsic frames (string)
@@ -73,7 +73,7 @@ void OnaEstimator::setup() {
   this->declare_parameter("extrinsics.wheelOdometryBetweenFrame", std::string(""));
   this->declare_parameter("extrinsics.wheelLinearVelocityLeftFrame", std::string(""));
   this->declare_parameter("extrinsics.wheelLinearVelocityRightFrame", std::string(""));
-  this->declare_parameter("extrinsics.vioOdometryFrame", std::string(""));
+  this->declare_parameter("extrinsics.OdometryFrame", std::string(""));
 
   // Wheel Radius (double)
   this->declare_parameter("sensor_params.wheelRadius", 0.0);
@@ -104,7 +104,7 @@ void OnaEstimator::setup() {
 
 void OnaEstimator::initializePublishers() {
   pubMeasMapLioPath_ = this->create_publisher<nav_msgs::msg::Path>("/holistic_fusion/measLiDAR_path_map_imu", ROS_QUEUE_SIZE_ONA);
-  pubMeasMapVioPath_ = this->create_publisher<nav_msgs::msg::Path>("/holistic_fusion/measVIO_path_map_imu", ROS_QUEUE_SIZE_ONA);
+  pubMeasMapOdomPath_ = this->create_publisher<nav_msgs::msg::Path>("/holistic_fusion/measOdometry_path_world_imu", ROS_QUEUE_SIZE_ONA);
   pubMeasWorldGnssPath_ = this->create_publisher<nav_msgs::msg::Path>("/holistic_fusion/measGNSS_path_world_gnss", ROS_QUEUE_SIZE_ONA);
 }
 
@@ -116,9 +116,9 @@ void OnaEstimator::initializeSubscribers() {
     REGULAR_COUT << COLOR_END << " Initialized GNSS Fix subscriber with topic: /gnss_fix_topic" << std::endl;
   }
 
-  if (useLioOdometryFlag_) {
+  if (useLioUnaryFlag_) {
     subLioOdometry_ = this->create_subscription<nav_msgs::msg::Odometry>(
-        "/lidar_odometry_topic", ROS_QUEUE_SIZE_ONA, std::bind(&OnaEstimator::lidarOdometryCallback_, this, std::placeholders::_1));
+        "/lidar_odometry_topic", ROS_QUEUE_SIZE_ONA, std::bind(&OnaEstimator::lidarUnaryCallback_, this, std::placeholders::_1));
     REGULAR_COUT << COLOR_END << " Initialized LiDAR Odometry subscriber with topic: /lidar_odometry_topic" << std::endl;
   }
 
@@ -134,16 +134,16 @@ void OnaEstimator::initializeSubscribers() {
     REGULAR_COUT << COLOR_END << " Initialized Wheel Linear Velocities subscriber with topic: /wheel_velocities_topic" << std::endl;
   }
 
-  if (useVioOdometryFlag_) {
-    subVioOdometry_ = this->create_subscription<nav_msgs::msg::Odometry>(
-        "/vio_odometry_topic", ROS_QUEUE_SIZE_ONA, std::bind(&OnaEstimator::vioOdometryCallback_, this, std::placeholders::_1));
-    REGULAR_COUT << COLOR_END << " Initialized VIO Odometry subscriber with topic: /vio_odometry_topic" << std::endl;
+  if (useOdometryFlag_) {
+    subOdometry_ = this->create_subscription<nav_msgs::msg::Odometry>(
+        "/odometry_topic", ROS_QUEUE_SIZE_ONA, std::bind(&OnaEstimator::odometryBetweenCallback_, this, std::placeholders::_1));
+    REGULAR_COUT << COLOR_END << " Initialized Odometry (LIO/VIO) subscriber with topic: /odometry_topic" << std::endl;
   }
 }
 
 void OnaEstimator::initializeMessages() {
   measLio_mapImuPathPtr_ = std::make_shared<nav_msgs::msg::Path>();
-  measVio_mapImuPathPtr_ = std::make_shared<nav_msgs::msg::Path>();
+  measOdom_worldImuPathPtr_ = std::make_shared<nav_msgs::msg::Path>();
   measGnss_worldGnssPathPtr_ = std::make_shared<nav_msgs::msg::Path>();
 }
 
@@ -154,8 +154,8 @@ void OnaEstimator::initializeServices() {
 void OnaEstimator::imuCallback(const sensor_msgs::msg::Imu::SharedPtr imuPtr) {
   const rclcpp::Time new_imu_timestamp{imuPtr->header.stamp};
 
-  if (holistic_fusion::HolisticFusion::areRollAndPitchInited() && !holistic_fusion::HolisticFusion::areYawAndPositionInited() && !useLioOdometryFlag_ &&
-      !useWheelOdometryBetweenFlag_ && !useWheelLinearVelocitiesFlag_ && !useVioOdometryFlag_) {
+  if (holistic_fusion::HolisticFusion::areRollAndPitchInited() && !holistic_fusion::HolisticFusion::areYawAndPositionInited() && !useLioUnaryFlag_ &&
+      !useWheelOdometryBetweenFlag_ && !useWheelLinearVelocitiesFlag_ && !useOdometryFlag_) {
     REGULAR_COUT << RED_START << " IMU callback is setting global yaw and position, as no other odometry is available. Initializing..."
                  << COLOR_END << std::endl;
 
@@ -200,7 +200,7 @@ void OnaEstimator::imuCallback(const sensor_msgs::msg::Imu::SharedPtr imuPtr) {
   holistic_fusion::HolisticFusionRos2::imuCallback(imuPtr);
 }
 
-void OnaEstimator::lidarOdometryCallback_(const nav_msgs::msg::Odometry::ConstSharedPtr& odomLidarPtr) {
+void OnaEstimator::lidarUnaryCallback_(const nav_msgs::msg::Odometry::ConstSharedPtr& odomLidarPtr) {
   static int lidarOdometryCallbackCounter__ = -1;
   static double lastLidarOdometryTimeK_ = 0.0;
 
@@ -353,7 +353,7 @@ void OnaEstimator::wheelOdometryPoseCallback_(const nav_msgs::msg::Odometry::Con
   const std::string& wheelOdometryFrame = dynamic_cast<OnaStaticTransforms*>(staticTransformsPtr_.get())->getWheelOdometryBetweenFrame();
 
   if (!areYawAndPositionInited()) {
-    if (!useLioOdometryFlag_) {
+    if (!useLioUnaryFlag_) {
       holistic_fusion::UnaryMeasurementXD<Eigen::Isometry3d, 6> unary6DMeasurement(
           "Lidar_unary_6D", int(wheelOdometryBetweenRate_), wheelOdometryFrame, wheelOdometryFrame + sensorFrameCorrectedNameId,
           holistic_fusion::RobustNorm::None(), wheelOdometryTimeK, 1.0, Eigen::Isometry3d::Identity(), Eigen::MatrixXd::Identity(6, 1));
@@ -388,7 +388,7 @@ void OnaEstimator::wheelLinearVelocitiesCallback_(const std_msgs::msg::Float64Mu
       dynamic_cast<OnaStaticTransforms*>(staticTransformsPtr_.get())->getWheelLinearVelocityRightFrame();
 
   if (!areYawAndPositionInited()) {
-    if (!useLioOdometryFlag_ && !useWheelOdometryBetweenFlag_) {
+    if (!useLioUnaryFlag_ && !useWheelOdometryBetweenFlag_) {
       holistic_fusion::UnaryMeasurementXD<Eigen::Isometry3d, 6> unary6DMeasurement(
           "Lidar_unary_6D", int(wheelLinearVelocitiesRate_), wheelLinearVelocityLeftFrame,
           wheelLinearVelocityLeftFrame + sensorFrameCorrectedNameId, holistic_fusion::RobustNorm::None(), timeK, 1.0,
@@ -410,21 +410,68 @@ void OnaEstimator::wheelLinearVelocitiesCallback_(const std_msgs::msg::Float64Mu
   }
 }
 
-void OnaEstimator::vioOdometryCallback_(const nav_msgs::msg::Odometry::ConstSharedPtr& vioOdomPtr) {
-  std::cout << "VIO odometry not yet stable enough for usage, disable flag." << std::endl;
+void OnaEstimator::odometryBetweenCallback_(const nav_msgs::msg::Odometry::ConstSharedPtr& OdomPtr) {
+  if (!areRollAndPitchInited()) {
+    return;
+  }
 
-  Eigen::Isometry3d vio_T_M_Ck;
-  holistic_fusion::odomMsgToEigen(*vioOdomPtr, vio_T_M_Ck.matrix());
+  // Counter
+  ++odomBetweenCallbackCounter_;
 
-  addToPathMsg(measVio_mapImuPathPtr_, vioOdomPtr->header.frame_id, vioOdomPtr->header.stamp,
-               (vio_T_M_Ck * staticTransformsPtr_
-                                 ->rv_T_frame1_frame2(dynamic_cast<OnaStaticTransforms*>(staticTransformsPtr_.get())->getVioOdometryFrame(),
-                                                      staticTransformsPtr_->getImuFrame())
-                                 .matrix())
-                   .block<3, 1>(0, 3),
-               graphConfigPtr_->imuBufferLength_ * 4 * 10);
+  // Convert
+  Eigen::Isometry3d odom_T_M_Lk = Eigen::Isometry3d::Identity();
+  holistic_fusion::odomMsgToEigen(*OdomPtr, odom_T_M_Lk.matrix());
+  // Get the time
+  double odomBetweenTimeK = rclcpp::Time(OdomPtr->header.stamp).seconds();
 
-  pubMeasMapVioPath_->publish(*measVio_mapImuPathPtr_);
+  // At start
+  if (odomBetweenCallbackCounter_ == 0) {
+    odom_T_M_Lkm1_ = odom_T_M_Lk;
+    odomBetweenTimeKm1_ = odomBetweenTimeK;
+  }
+
+  // Add to trajectory aligner if needed.
+  // if (useGnssUnaryFlag_ && gnssHandlerPtr_->getUseYawInitialGuessFromAlignment()) {
+  //   trajectoryAlignmentHandler_->addSe3Position(odom_T_M_Lk.translation(), odomBetweenTimeK);
+  // }
+
+  // Frame Name
+  const std::string& OdomFrameName = dynamic_cast<OnaStaticTransforms*>(staticTransformsPtr_.get())->getOdometryFrame();  // alias
+
+  // State Machine
+  if (odomBetweenCallbackCounter_ <= 2) {
+    return;
+  } else if (!areYawAndPositionInited()) {  // Initializing
+    if (!useGnssUnaryFlag_ && !useLioUnaryFlag_) {
+      // Measurement
+      holistic_fusion::UnaryMeasurementXD<Eigen::Isometry3d, 6> unary6DMeasurement(
+          "Odom_unary_6D", int(OdometryRate_), OdomFrameName, OdomFrameName + sensorFrameCorrectedNameId,
+          holistic_fusion::RobustNorm::None(), odomBetweenTimeK, 1.0, odom_T_M_Lk, lioPoseUnaryNoise_);
+      // Add to graph
+      REGULAR_COUT << GREEN_START << "Odometry (LIO/VIO) callback is setting global yaw, as it was not set so far." << COLOR_END << std::endl;
+      this->initYawAndPosition(unary6DMeasurement);
+    }
+  } else {  // Already initialized --> Between factor
+    // Compute Delta
+    const Eigen::Isometry3d T_Lkm1_Lk = odom_T_M_Lkm1_.inverse() * odom_T_M_Lk;
+    // Create measurement
+    holistic_fusion::BinaryMeasurementXD<Eigen::Isometry3d, 6> delta6DMeasurement(
+        "Odom_between_6D", int(OdometryRate_), OdomFrameName, OdomFrameName + sensorFrameCorrectedNameId,
+        holistic_fusion::RobustNorm::None(), odomBetweenTimeKm1_, odomBetweenTimeK, T_Lkm1_Lk, lioPoseUnaryNoise_);
+    // Add to graph
+    this->addBinaryPose3Measurement(delta6DMeasurement);
+  }
+  // Provide for next iteration
+  odom_T_M_Lkm1_ = odom_T_M_Lk;
+  odomBetweenTimeKm1_ = odomBetweenTimeK;
+
+  // Visualization ----------------------------
+  // Add to path message
+  addToPathMsg(measOdom_worldImuPathPtr_, staticTransformsPtr_->getWorldFrame(), OdomPtr->header.stamp, odom_T_M_Lk.translation(),
+               graphConfigPtr_->imuBufferLength_ * 4);
+
+  // Publish Path
+  pubMeasMapOdomPath_->publish(*measOdom_worldImuPathPtr_);
 }
 
 }  // namespace ona_se

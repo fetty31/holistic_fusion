@@ -24,7 +24,7 @@ class OnaStaticTransforms : public holistic_fusion::StaticTransformsTf {
   void setWheelOdometryBetweenFrame(const std::string& s) { wheelOdometryBetweenFrame_ = s; }
   void setWheelLinearVelocityLeftFrame(const std::string& s) { wheelLinearVelocityLeftFrame_ = s; }
   void setWheelLinearVelocityRightFrame(const std::string& s) { wheelLinearVelocityRightFrame_ = s; }
-  void setVioOdometryFrame(const std::string& s) { vioOdometryFrame_ = s; }
+  void setOdometryFrame(const std::string& s) { OdometryFrame_ = s; }
 
   // Getters
   const std::string& getLioOdometryFrame() const { return lidarOdometryFrame_; }
@@ -32,12 +32,12 @@ class OnaStaticTransforms : public holistic_fusion::StaticTransformsTf {
   const std::string& getWheelOdometryBetweenFrame() const { return wheelOdometryBetweenFrame_; }
   const std::string& getWheelLinearVelocityLeftFrame() const { return wheelLinearVelocityLeftFrame_; }
   const std::string& getWheelLinearVelocityRightFrame() const { return wheelLinearVelocityRightFrame_; }
-  const std::string& getVioOdometryFrame() const { return vioOdometryFrame_; }
+  const std::string& getOdometryFrame() const { return OdometryFrame_; }
 
   // Set flags
-  void setUseLioOdometryFlag(bool flag) { useLioOdometryFlag_ = flag; }
+  void setUseLioUnaryFlag(bool flag) { useLioUnaryFlag_ = flag; }
   void setUseGnssFlag(bool flag) { useGnssUnaryFlag_ = flag; }
-  void setUseVioOdometryFlag(bool flag) { useVioOdometryFlag_ = flag; }
+  void setUseOdometryFlag(bool flag) { useOdometryFlag_ = flag; }
   void setUseWheelOdometryBetweenFlag(bool flag) { useWheelOdometryBetweenFlag_ = flag; }
   void setUseWheelLinearVelocitiesFlag(bool flag) { useWheelLinearVelocitiesFlag_ = flag; }
 
@@ -50,12 +50,12 @@ class OnaStaticTransforms : public holistic_fusion::StaticTransformsTf {
   std::string wheelOdometryBetweenFrame_;
   std::string wheelLinearVelocityLeftFrame_;
   std::string wheelLinearVelocityRightFrame_;
-  std::string vioOdometryFrame_;
+  std::string OdometryFrame_;
 
   // Odometry flags
-  bool useLioOdometryFlag_ = false;
+  bool useLioUnaryFlag_ = false;
   bool useGnssUnaryFlag_ = false;
-  bool useVioOdometryFlag_ = false;
+  bool useOdometryFlag_ = false;
   bool useWheelOdometryBetweenFlag_ = false;
   bool useWheelLinearVelocitiesFlag_ = false;
 };
